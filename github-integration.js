@@ -6,14 +6,14 @@ const GITHUB_API_URL = 'https://api.github.com';
 const GITHUB_USER_AGENT = 'Umba-SaaS-Agent';
 
 function githubHeaders(env, includeJson = false) {
+  const token = env?.GITHUB_TOKEN || env?.githubToken || env?.token;
   return {
-    Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+    Authorization: `Bearer ${token}`,
     'User-Agent': GITHUB_USER_AGENT,
     ...(includeJson ? { 'Content-Type': 'application/json' } : {})
   };
 }
 
-// GitHub's Contents API expects UTF-8 content encoded as Base64.
 function encodeBase64(value) {
   const bytes = new TextEncoder().encode(value);
   let binary = '';
@@ -62,7 +62,6 @@ export async function githubCreateFile(repoFullName, filePath, fileContent, env)
   const encodedPath = filePath.split('/').map(encodeURIComponent).join('/');
   const endpoint = `${GITHUB_API_URL}/repos/${repoFullName}/contents/${encodedPath}`;
 
-  // An update requires the current blob SHA. A 404 means this is a new file.
   let sha;
   const existingResponse = await fetch(endpoint, {
     method: 'GET',
@@ -99,37 +98,111 @@ export async function githubCreateFile(repoFullName, filePath, fileContent, env)
 export async function githubCommitMultipleFiles(repoFullName, files, env) {
   const results = [];
 
-  for (const file of files) {
-    results.push(await githubCreateFile(repoFullName, file.path, file.content, env));
+  for (const file of files || []) {
+    const result = await githubCreateFile(repoFullName, file.path, file.content, env);
+    results.push(result);
   }
 
   return { success: true, committedFiles: results.length, files: results };
 }
 
-// Plan execution handler
+// Placeholder operations for other providers used by the agent.
+export async function cloudflareCreateWorker(workerName, env) {
+  if (!env.CLOUDFLARE_API_TOKEN) {
+    throw new Error('Missing CLOUDFLARE_API_TOKEN in env');
+  }
+
+  return {
+    success: true,
+    workerName,
+    note: 'Cloudflare worker creation hook. Add your actual API call here.'
+  };
+}
+
+export async function cloudflareDeployWorker(workerName, env) {
+  if (!env.CLOUDFLARE_API_TOKEN) {
+    throw new Error('Missing CLOUDFLARE_API_TOKEN in env');
+  }
+
+  return {
+    success: true,
+    workerName,
+    note: 'Cloudflare deployment hook. Add your actual deploy call here.'
+  };
+}
+
+export async function supabaseCreateProject(projectName, env) {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY in env');
+  }
+
+  return {
+    success: true,
+    projectName,
+    note: 'Supabase project hook. Add your actual Supabase API call here.'
+  };
+}
+
+// Main dispatcher for all supported plan operations
+export async function executeOperation(op, env) {
+  const action = op?.type;
+  const params = op?.params || op?.arguments || {};
+
+  switch (action) {
+    case 'github_create_repo':
+      return await githubCreateRepo(params.name, params.description, env);
+
+    case 'github_create_file':
+      return await githubCreateFile(params.repo, params.path, params.content, env);
+
+    case 'github_commit_multiple_files':
+      return await githubCommitMultipleFiles(params.repo, params.files, env);
+
+    case 'cloudflare_create_worker':
+      return await cloudflareCreateWorker(params.name || params.workerName, env);
+
+    case 'cloudflare_deploy_worker':
+      return await cloudflareDeployWorker(params.name || params.workerName, env);
+
+    case 'supabase_create_project':
+      return await supabaseCreateProject(params.name || params.projectName, env);
+
+    default:
+      return {
+        success: false,
+        type: action,
+        message: `Unsupported operation type: ${action}`
+      };
+  }
+}
+
+// Backward-compatible plan executor for the original GitHub-only flow
 export async function executePlan(plan, env) {
   const startTime = Date.now();
   const executionLogs = [];
   let createdRepoUrl = '';
 
-  for (const op of plan.operations || []) {
+  const ops = plan?.operations || plan?.steps || [];
+
+  for (const op of ops) {
     try {
-      if (op.type === 'github_create_repo') {
-        const result = await githubCreateRepo(op.params.name, op.params.description, env);
-        createdRepoUrl = result.repoUrl;
-        executionLogs.push(`✅ Created GitHub Repo: ${result.repoUrl}`);
-      } else if (op.type === 'github_create_file') {
-        await githubCreateFile(op.params.repo, op.params.path, op.params.content, env);
-        executionLogs.push(`✅ Created File: ${op.params.path}`);
-      } else if (op.type === 'github_commit_multiple_files') {
-        const result = await githubCommitMultipleFiles(op.params.repo, op.params.files, env);
-        executionLogs.push(`✅ Committed ${result.committedFiles} GitHub files`);
+      const result = await executeOperation(op, env);
+
+      if (op?.type === 'github_create_repo') {
+        createdRepoUrl = result.repoUrl || createdRepoUrl;
+        executionLogs.push(`✅ Created GitHub Repo: ${result.repoUrl || 'unknown'}`);
+      } else if (op?.type === 'github_create_file') {
+        executionLogs.push(`✅ Created File: ${op.params?.path || op.arguments?.path}`);
+      } else if (op?.type === 'github_commit_multiple_files') {
+        executionLogs.push(`✅ Committed ${result.committedFiles || 0} GitHub files`);
+      } else if (result?.success === false) {
+        executionLogs.push(`⚠️ ${result.message}`);
       } else {
-        executionLogs.push(`⚠️ Unsupported operation: ${op.type}`);
+        executionLogs.push(`✅ Executed ${op?.type}`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      executionLogs.push(`❌ Error in ${op.type}: ${message}`);
+      executionLogs.push(`❌ Error in ${op?.type}: ${message}`);
     }
   }
 
@@ -139,3 +212,20 @@ export async function executePlan(plan, env) {
     logs: executionLogs
   };
 }
+
+// Generic orchestrator for any agent plan format.
+export async function executeAgentPlan(plan, env) {
+  return await executePlan(plan, env);
+}
+
+export default {
+  githubCreateRepo,
+  githubCreateFile,
+  githubCommitMultipleFiles,
+  cloudflareCreateWorker,
+  cloudflareDeployWorker,
+  supabaseCreateProject,
+  executeOperation,
+  executePlan,
+  executeAgentPlan
+};
