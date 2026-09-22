@@ -1,0 +1,12 @@
+{
+  "name": "umba-nexus-ai",
+  "version": "5.4.0",
+  "description": "UMBA NEXUS v5.4 — AI Worker with 48 models, 9 plugin categories, advanced memory system, and multi-model fallback chain",
+  "main": "worker.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "keywords": ["cloudflare", "workers", "ai", "nexus", "llm", "image-generation", "translation", "tts", "stt"],
+  "license": "MIT"
+}
