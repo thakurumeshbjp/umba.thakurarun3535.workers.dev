@@ -6,6 +6,8 @@
 
 UMBA is a Cloudflare Worker powered by Workers AI with 48 models across 9 plugin categories. It features an advanced memory system with 6-day chat history (auto-expiring) and permanent memory (never deleted) for important facts.
 
+**✨ New:** Integrated with Vercel Web Analytics for tracking visitor insights and page views on the landing page.
+
 ## Features
 
 ### 🧠 Text Generation (22 models)
@@ -46,6 +48,8 @@ DETR-ResNet-50
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/` | Landing page with Vercel Analytics |
+| `GET` | `/api` | JSON API info (programmatic access) |
 | `POST` | `/` | Chat with NEXUS (22 text models fallback) |
 | `POST` | `/image` | Generate image from text |
 | `POST` | `/transcribe` | Speech-to-text |
@@ -86,6 +90,21 @@ wrangler dev
 - `NEXUS_AI` — Workers AI binding
 - `CHAT_HISTORY` — KV namespace for chat history
 - `PERMANENT_MEMORY` — KV namespace for permanent memory
+
+## Vercel Web Analytics
+
+This project integrates Vercel Web Analytics for tracking visitor insights and page views. The analytics script is included in the landing page served at the root path (`/`).
+
+### Setup for Vercel Deployment
+
+1. Deploy your worker to Cloudflare
+2. To enable analytics tracking when deploying on Vercel:
+   - Go to your Vercel dashboard
+   - Navigate to Analytics in the sidebar
+   - Click "Enable" to activate Web Analytics
+   - Analytics will track page views and visitor insights automatically
+
+The analytics implementation follows the [official Vercel documentation](https://vercel.com/docs/analytics/quickstart) using the HTML script method.
 
 ## License
 
