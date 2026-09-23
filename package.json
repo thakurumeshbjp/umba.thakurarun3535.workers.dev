@@ -8,10 +8,23 @@
     "dev": "wrangler dev",
     "login": "wrangler login"
   },
-  "keywords": ["cloudflare", "workers", "ai", "nexus", "llm", "image-generation", "translation", "tts", "stt"],
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "ai",
+    "nexus",
+    "llm",
+    "image-generation",
+    "translation",
+    "tts",
+    "stt"
+  ],
   "license": "MIT",
   "private": true,
   "devDependencies": {
     "wrangler": "^3.95.0"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1"
   }
 }
